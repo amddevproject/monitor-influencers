@@ -591,6 +591,45 @@ def login_page():
 
 # Função principal da aplicação
 def main():
+    init_db() # Agora a chamada para init_db está após a sua definição
+    
+    if 'logged_in' not in st.session_state or not st.session_state['logged_in']:
+        login_page()
+    else:
+        st.title(f"Bem-vindo, {st.session_state['username']}!")
+        st.write("Aqui seria o conteúdo principal da sua aplicação.")
+        if st.sidebar.button("Sair"):
+            st.session_state['logged_in'] = False
+            st.session_state['username'] = None
+            st.rerun()
+
+if __name__ == '__main__':
+    main()
+
+# ==============================================
+# INTERFACE DO STREAMLIT
+# ==============================================
+# Função para exibir a tela de login
+def login_page():
+    st.sidebar.header("Login")
+    username = st.sidebar.text_input("Usuário")
+    password = st.sidebar.text_input("Senha", type="password")
+    
+    if st.sidebar.button("Entrar"):
+        cursor.execute("SELECT senha FROM usuarios WHERE usuario = ?", (username,))
+        result = cursor.fetchone()
+        
+        if result and check_password(password, result[0]):
+            st.success(f"Bem-vindo, {username}!")
+            # Em uma aplicação real, você definiria um estado de sessão aqui.
+            st.session_state['logged_in'] = True
+            st.session_state['username'] = username
+            st.rerun()
+        else:
+            st.error("Usuário ou senha incorretos.")
+
+# Função principal da aplicação
+def main():
     init_db()
     
     if 'logged_in' not in st.session_state or not st.session_state['logged_in']:
