@@ -289,7 +289,7 @@ def get_tiktok_data_from_scraping(username):
         return None
 
 # ...existing code...
-conn, cursor = init_db()
+#conn, cursor = init_db()
 
 def estimate_earnings(views):
     """Estimativa simples de ganhos baseada em visualizações."""
