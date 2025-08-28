@@ -490,18 +490,21 @@ st.set_page_config(layout="wide", page_title="Gerenciamento de Influencers")
 conn = sqlite3.connect('tiktok_data.db')
 cursor = conn.cursor()
 
+# ==============================================
+# FUNÇÕES DO APLICATIVO
+# ==============================================
+
 def hash_password(password):
     """
-    Gera um hash seguro para a senha usando bcrypt.
+    Cria um hash da senha usando bcrypt.
     
     Args:
-        password (str): A senha em texto puro.
+        password (str): A senha em texto simples.
         
     Returns:
-        bytes: O hash da senha em bytes.
+        bytes: O hash da senha.
     """
-    # bcrypt.gensalt() gera um 'salt' único para cada senha,
-    # tornando o hash mais seguro.
+    # A senha precisa ser codificada em bytes para usar o bcrypt
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
 
 def check_password(password, hashed_password):
@@ -518,7 +521,7 @@ def check_password(password, hashed_password):
     return bcrypt.checkpw(password.encode('utf-8'), hashed_password)
 
 def init_db():
-    """Inicializa as tabelas do banco de dados, se não existirem."""
+    """Inicializa as tabelas do banco de dados, se não existirem, e insere usuários padrão."""
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS usuarios (
         usuario TEXT PRIMARY KEY,
@@ -570,8 +573,9 @@ def init_db():
 # ==============================================
 # INTERFACE DO STREAMLIT
 # ==============================================
-# Função para exibir a tela de login
+
 def login_page():
+    """Exibe a tela de login."""
     st.sidebar.header("Login")
     username = st.sidebar.text_input("Usuário")
     password = st.sidebar.text_input("Senha", type="password")
@@ -582,68 +586,34 @@ def login_page():
         
         if result and check_password(password, result[0]):
             st.success(f"Bem-vindo, {username}!")
-            # Em uma aplicação real, você definiria um estado de sessão aqui.
             st.session_state['logged_in'] = True
             st.session_state['username'] = username
             st.rerun()
         else:
             st.error("Usuário ou senha incorretos.")
 
-# Função principal da aplicação
-def main():
-    init_db() # Agora a chamada para init_db está após a sua definição
+def main_app():
+    """Exibe o conteúdo principal da aplicação."""
+    st.title(f"Bem-vindo, {st.session_state['username']}!")
+    st.write("Aqui seria o conteúdo principal da sua aplicação.")
+    if st.sidebar.button("Sair"):
+        st.session_state['logged_in'] = False
+        st.session_state['username'] = None
+        st.rerun()
+
+# ==============================================
+# PONTO DE ENTRADA DO APLICATIVO
+# ==============================================
+
+if __name__ == '__main__':
+    # Inicializa o banco de dados antes de tudo
+    init_db() 
     
+    # Verifica o estado da sessão para decidir qual página exibir
     if 'logged_in' not in st.session_state or not st.session_state['logged_in']:
         login_page()
     else:
-        st.title(f"Bem-vindo, {st.session_state['username']}!")
-        st.write("Aqui seria o conteúdo principal da sua aplicação.")
-        if st.sidebar.button("Sair"):
-            st.session_state['logged_in'] = False
-            st.session_state['username'] = None
-            st.rerun()
-
-if __name__ == '__main__':
-    main()
-
-# ==============================================
-# INTERFACE DO STREAMLIT
-# ==============================================
-# Função para exibir a tela de login
-def login_page():
-    st.sidebar.header("Login")
-    username = st.sidebar.text_input("Usuário")
-    password = st.sidebar.text_input("Senha", type="password")
-    
-    if st.sidebar.button("Entrar"):
-        cursor.execute("SELECT senha FROM usuarios WHERE usuario = ?", (username,))
-        result = cursor.fetchone()
-        
-        if result and check_password(password, result[0]):
-            st.success(f"Bem-vindo, {username}!")
-            # Em uma aplicação real, você definiria um estado de sessão aqui.
-            st.session_state['logged_in'] = True
-            st.session_state['username'] = username
-            st.rerun()
-        else:
-            st.error("Usuário ou senha incorretos.")
-
-# Função principal da aplicação
-def main():
-    init_db()
-    
-    if 'logged_in' not in st.session_state or not st.session_state['logged_in']:
-        login_page()
-    else:
-        st.title(f"Bem-vindo, {st.session_state['username']}!")
-        st.write("Aqui seria o conteúdo principal da sua aplicação.")
-        if st.sidebar.button("Sair"):
-            st.session_state['logged_in'] = False
-            st.session_state['username'] = None
-            st.rerun()
-
-if __name__ == '__main__':
-    main()
+        main_app()
 
 # ==============================================
 # FUNÇÕES DO APLICATIVO
