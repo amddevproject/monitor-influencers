@@ -490,6 +490,11 @@ st.set_page_config(layout="wide", page_title="Gerenciamento de Influencers")
 conn = sqlite3.connect('tiktok_data.db')
 cursor = conn.cursor()
 
+# Inicializa o estado da sessão
+if 'logged_in' not in st.session_state:
+    st.session_state['logged_in'] = False
+if 'username' not in st.session_state:
+    st.session_state['username'] = None
 # ==============================================
 # FUNÇÕES DO APLICATIVO
 # ==============================================
