@@ -113,7 +113,7 @@ def get_db_connection():
 def init_db(conn):
     
 #    Hashing das senhas antes de inserir
-    admin_senha_hashed = hash_password('alfa@01admin')
+    admin_senha_hashed = hash_password('dev')
     dev_senha_hashed = hash_password('dev@123')
 
     cursor.execute("INSERT OR IGNORE INTO usuarios (usuario, senha, tipo) VALUES (?, ?, ?)",
@@ -203,7 +203,7 @@ def init_db(conn):
 # Obtém a conexão cacheada e inicializa o banco de dados
 conn = get_db_connection()
 if conn:
-    init_db(conn)
+    #init_db(conn)
     cursor = conn.cursor()
 
 # ==============================================
