@@ -392,10 +392,16 @@ def main_app():
                     st.error("Não foi possível obter os dados do influencer. Verifique o nome ou tente novamente.")
 
     st.header("2. Análise do Histórico de Influencers")
-    influencers_disponiveis = pd.read_sql_query(
-        "SELECT DISTINCT influencer FROM historico WHERE usuario = ?", conn, params=[st.session_state.usuario]
-    )['influencer'].tolist()
-
+    
+    # Adicionando try-except para tratar o erro de coluna ausente
+    try:
+        influencers_disponiveis = pd.read_sql_query(
+            "SELECT DISTINCT influencer FROM historico WHERE usuario = ?", conn, params=[st.session_state.usuario]
+        )['influencer'].tolist()
+    except KeyError:
+        influencers_disponiveis = []
+        st.info("Nenhum influencer encontrado no histórico. Use a seção acima para adicionar um.")
+        
     if not influencers_disponiveis:
         st.info("Nenhum influencer encontrado no histórico. Use a seção acima para adicionar um.")
     else:
