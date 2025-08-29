@@ -12,6 +12,10 @@ import time
 
 
 
+# ...
+# Seu código continua abaixo
+
+
 # ==============================================
 # CONFIGURAÇÃO INICIAL DO APP
 # ==============================================
@@ -86,7 +90,7 @@ def convert_to_int(text):
 
 def estimate_earnings(views):
     """Estimativa simples de ganhos baseada em visualizações."""
-# Ajuste conforme sua lógica
+    # Ajuste conforme sua lógica
     return views * 0.01
 # ...existing code...
 
@@ -684,9 +688,7 @@ def main_app():
                     if not df_produtos.empty:
                         df_produtos['data'] = pd.to_datetime(df_produtos['data']).dt.strftime('%Y-%m-%d %H:%M:%S')
                         st.dataframe(df_produtos, use_container_width=True)
-                        #exportar_excel(df_produtos, filename="produtos_ganhados.xlsx")
-                        df_produtos.to_excel("produtos_ganhados.xlsx", index=False)
-                                                
+                        exportar_excel(df_produtos, filename="produtos_ganhados.xlsx")
                     else:
                         st.info("Nenhum produto encontrado para os influencers e período selecionados.")
 
