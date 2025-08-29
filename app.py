@@ -10,7 +10,6 @@ import requests
 import json
 import time
 from playwright.sync_api import sync_playwright, Error as PlaywrightError
-from playwright.cli import main as playwright_main
 
 # ==============================================
 # CONFIGURAÇÃO INICIAL DO APP
