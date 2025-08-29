@@ -638,7 +638,7 @@ def main_app():
                     if not df_produtos.empty:
                         df_produtos['data'] = pd.to_datetime(df_produtos['data']).dt.strftime('%Y-%m-%d %H:%M:%S')
                         st.dataframe(df_produtos, use_container_width=True)
-                        exportar_excel(df_produtos, filename="produtos_ganhados.xlsx")
+                        exportar_excel(df_produtos, filename="produtos_ganhados.xlsx")                        
                     else:
                         st.info("Nenhum produto encontrado para os influencers e período selecionados.")
     if st.sidebar.button("Sair"):
