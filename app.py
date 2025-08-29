@@ -300,6 +300,30 @@ def exportar_excel(df, filename="relatorio.xlsx"):
     except Exception as e:
         st.error(f"Erro ao exportar arquivo: {str(e)}")
 
+def _fetch_data(user, influencers, start_date, end_date):
+    """
+    Função auxiliar para buscar dados do banco de dados com tratamento de erro.
+    """
+    if not influencers:
+        return pd.DataFrame()
+    
+    placeholders = ','.join(['?'] * len(influencers))
+    query = f"""
+    SELECT influencer, tipo, valor, data, ganhos, live_curtidas, live_visualizacoes
+    FROM historico
+    WHERE usuario = ? AND data >= ? AND data <= ? AND influencer IN ({placeholders})
+    """
+    
+    # Converte os parâmetros para uma tupla para evitar erros de tipo
+    params = tuple([user, start_date.strftime("%Y-%m-%d 00:00:00"),
+                    end_date.strftime("%Y-%m-%d 23:59:59")] + influencers)
+
+    try:
+        return pd.read_sql_query(query, conn, params=params)
+    except Exception as e:
+        st.error(f"Erro ao buscar dados do banco de dados: {e}")
+        return pd.DataFrame()
+
 # ==============================================
 # INTERFACES DO USUÁRIO
 # ==============================================
@@ -394,16 +418,8 @@ def main_app():
             if not influencers_selecionados:
                 st.warning("Por favor, selecione ao menos um influencer.")
             else:
-                query = """
-                SELECT influencer, tipo, valor, data, ganhos, live_curtidas, live_visualizacoes
-                FROM historico
-                WHERE usuario = ? AND data >= ? AND data <= ? AND influencer IN ({})
-                """.format(','.join(['?'] * len(influencers_selecionados)))
-
-                params = [st.session_state.usuario, data_inicio.strftime("%Y-%m-%d 00:00:00"),
-                          data_fim.strftime("%Y-%m-%d 23:59:59")] + influencers_selecionados
-
-                df = pd.read_sql_query(query, conn, params=params)
+                # Chama a nova função refatorada para buscar os dados
+                df = _fetch_data(st.session_state.usuario, influencers_selecionados, data_inicio, data_fim)
 
                 if not df.empty:
                     df['data'] = pd.to_datetime(df['data'])
