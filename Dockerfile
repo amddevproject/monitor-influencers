@@ -1,5 +1,5 @@
 # Use a imagem base
-FROM mcr.microsoft.com/playwright:v1.54.0-jammy
+FROM mcr.microsoft.com/playwright:v1.55.0-jammy
 
 # Garantir que o pip esteja atualizado
 RUN apt-get update && apt-get install -y python3-pip
