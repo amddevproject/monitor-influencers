@@ -10,6 +10,14 @@ import requests
 import json
 import time
 from playwright.sync_api import sync_playwright, Error as PlaywrightError
+from playwright.cli import main as playwright_main
+
+# Instala o navegador do Playwright, se necessário.
+# Isso garante que o script funcione em ambientes sem navegador pré-instalado.
+try:
+    playwright_main(["install", "chromium"])
+except Exception as e:
+    st.error(f"Erro ao instalar o navegador do Playwright: {e}")
 
 # ==============================================
 # CONFIGURAÇÃO INICIAL DO APP
