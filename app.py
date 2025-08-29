@@ -1,7 +1,7 @@
+from playwright.sync_api import Playwright, sync_playwright, Error as PlaywrightError
 import streamlit as st
 import pandas as pd
 import sqlite3
-import bcrypt
 from datetime import datetime, timedelta
 import plotly.express as px
 import tempfile
@@ -9,7 +9,8 @@ import os
 import requests
 import json
 import time
-from playwright.sync_api import sync_playwright, Error as PlaywrightError
+
+
 
 # ==============================================
 # CONFIGURAÇÃO INICIAL DO APP
@@ -67,6 +68,7 @@ st.markdown(
 """, unsafe_allow_html=True
 )
 
+# ...existing code...
 def convert_to_int(text):
     """Converte texto do TikTok (ex: '1.2M') para inteiro."""
     text = text.replace(',', '').replace('.', '')
@@ -84,19 +86,9 @@ def convert_to_int(text):
 
 def estimate_earnings(views):
     """Estimativa simples de ganhos baseada em visualizações."""
+# Ajuste conforme sua lógica
     return views * 0.01
-
-def hash_password(password):
-    """
-    Cria um hash da senha usando bcrypt.
-    """
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-
-def check_password(password, hashed_password):
-    """
-    Verifica se a senha em texto puro corresponde ao hash.
-    """
-    return bcrypt.checkpw(password.encode('utf-8'), hashed_password)
+# ...existing code...
 
 # ==============================================
 # BANCO DE DADOS
@@ -111,7 +103,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             usuario TEXT UNIQUE,
-            senha BLOB,
+            senha TEXT,
             tipo TEXT
         )
         """)
@@ -146,25 +138,22 @@ def init_db():
             cursor.execute("ALTER TABLE historico ADD COLUMN ganhos REAL")
         except sqlite3.OperationalError:
             pass
+
         try:
             cursor.execute("ALTER TABLE historico ADD COLUMN live_curtidas INTEGER")
         except sqlite3.OperationalError:
             pass
+
         try:
             cursor.execute("ALTER TABLE historico ADD COLUMN live_visualizacoes INTEGER")
         except sqlite3.OperationalError:
             pass
 
-        # Adiciona usuários de login, usando senhas hasheadas
-        cursor.execute("SELECT usuario FROM usuarios WHERE usuario = 'admin'")
-        if not cursor.fetchone():
-            cursor.execute("INSERT INTO usuarios (usuario, senha, tipo) VALUES (?, ?, ?)",
-                           ('admin', hash_password('alfa@01admin'), 'criador'))
-        
-        cursor.execute("SELECT usuario FROM usuarios WHERE usuario = 'dev'")
-        if not cursor.fetchone():
-            cursor.execute("INSERT INTO usuarios (usuario, senha, tipo) VALUES (?, ?, ?)",
-                           ('dev', hash_password('dev@123'), 'criador'))
+        # Adiciona ou atualiza usuários de login
+        cursor.execute("INSERT OR IGNORE INTO usuarios (usuario, senha, tipo) VALUES (?, ?, ?)",
+                       ('admin', 'alfa@01admin', 'criador'))
+        cursor.execute("INSERT OR IGNORE INTO usuarios (usuario, senha, tipo) VALUES (?, ?, ?)",
+                       ('dev', 'dev@123', 'criador'))
 
         conn.commit()
         return conn, cursor
@@ -173,7 +162,17 @@ def init_db():
         st.error(f"Erro ao inicializar banco de dados: {str(e)}")
         return None, None
 
+
 conn, cursor = init_db()
+
+
+# ==============================================
+# CONFIGURAÇÃO DO PLAYWRIGHT E NAVEGADOR
+# ==============================================
+def setup_playwright():
+    p = sync_playwright().start()
+    browser = p.chromium.launch(headless=True)
+    return p, browser
 
 # ==============================================
 # FUNÇÕES DE SCRAPING
@@ -193,6 +192,7 @@ def get_tiktok_data_from_scraping(username):
             followers_elem = page.locator("xpath=//strong[@data-e2e='followers-count']")
             likes_elem = page.locator("xpath=//strong[@data-e2e='likes-count']")
 
+            # Wait for elements to be visible
             followers_elem.wait_for(state="visible")
             likes_elem.wait_for(state="visible")
 
@@ -206,6 +206,9 @@ def get_tiktok_data_from_scraping(username):
                 'visualizacoes': views_num
             }
 
+    except TimeoutError:
+        st.error("Erro: O tempo limite para carregar a página ou encontrar elementos foi excedido. O influencer pode não existir ou a conexão está lenta.")
+        return None
     except PlaywrightError as e:
         st.error(f"Erro do Playwright. Verifique a página do influencer. Erro: {str(e)}")
         return None
@@ -213,19 +216,51 @@ def get_tiktok_data_from_scraping(username):
         st.error(f"Erro inesperado no scraping: {str(e)}")
         return None
 
+# ...existing code...
+conn, cursor = init_db()
+
+# ==============================================
+# FUNÇÕES UTILITÁRIAS
+# ==============================================
+def convert_to_int(text):
+    """Converte texto do TikTok (ex: '1.2M') para inteiro."""
+    text = text.replace(',', '').replace('.', '')
+    if 'K' in text:
+        return int(float(text.replace('K', '')) * 1000)
+    elif 'M' in text:
+        return int(float(text.replace('M', '')) * 1000000)
+    elif 'B' in text:
+        return int(float(text.replace('B', '')) * 1000000000)
+    else:
+        try:
+            return int(text)
+        except:
+            return 0
+
+def estimate_earnings(views):
+    """Estimativa simples de ganhos baseada em visualizações."""
+    # Ajuste conforme sua lógica
+    return views * 0.01
+
+# ==============================================
+# CONFIGURAÇÃO DO PLAYWRIGHT PARA AMBIENTES HEADLESS
+# ==============================================
+def setup_playwright():
+    p = sync_playwright().start()
+    browser = p.chromium.launch(headless=True)
+    return p, browser
+# ...existing code...
 # ==============================================
 # FUNÇÕES DO APLICATIVO
 # ==============================================
 def verificar_login(usuario, senha):
     try:
-        cursor.execute("SELECT senha, tipo FROM usuarios WHERE usuario=?", (usuario,))
-        result = cursor.fetchone()
-        if result and check_password(senha, result[0]):
-            return True, result[1]
-        return False, None
+        cursor.execute("SELECT * FROM usuarios WHERE usuario=? AND senha=?", (usuario, senha))
+        return cursor.fetchone()
     except Exception as e:
         st.error(f"Erro ao verificar login: {str(e)}")
-        return False, None
+        return None
+
 
 def adicionar_registro(usuario, influencer, tipo, valor, metodo, live_curtidas=0, live_visualizacoes=0):
     try:
@@ -241,6 +276,7 @@ def adicionar_registro(usuario, influencer, tipo, valor, metodo, live_curtidas=0
         st.error(f"Erro ao adicionar registro: {str(e)}")
         return False
 
+
 def check_monthly_live_scrape(influencer, usuario):
     cursor.execute("""
     SELECT data FROM historico
@@ -255,6 +291,7 @@ def check_monthly_live_scrape(influencer, usuario):
             return False
     return True
 
+
 def adicionar_produto_live(influencer, nome_produto, valor_estimado):
     try:
         data = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -268,6 +305,7 @@ def adicionar_produto_live(influencer, nome_produto, valor_estimado):
         st.error(f"Erro ao adicionar produto: {str(e)}")
         return False
 
+
 def get_produtos_ganhados(influencers, data_inicio, data_fim):
     try:
         query = """
@@ -275,12 +313,15 @@ def get_produtos_ganhados(influencers, data_inicio, data_fim):
         FROM produtos_live
         WHERE influencer IN ({}) AND data >= ? AND data <= ?
         """.format(','.join(['?'] * len(influencers)))
+
         params = influencers + [data_inicio.strftime("%Y-%m-%d 00:00:00"), data_fim.strftime("%Y-%m-%d 23:59:59")]
+
         df = pd.read_sql_query(query, conn, params=params)
         return df
     except Exception as e:
         st.error(f"Erro ao buscar produtos: {str(e)}")
         return pd.DataFrame()
+
 
 def exportar_excel(df, filename="relatorio.xlsx"):
     try:
@@ -299,29 +340,6 @@ def exportar_excel(df, filename="relatorio.xlsx"):
     except Exception as e:
         st.error(f"Erro ao exportar arquivo: {str(e)}")
 
-def _fetch_data(user, influencers, start_date, end_date):
-    """
-    Função auxiliar para buscar dados do banco de dados com tratamento de erro.
-    """
-    if not influencers:
-        return pd.DataFrame()
-    
-    placeholders = ','.join(['?'] * len(influencers))
-    query = f"""
-    SELECT influencer, tipo, valor, data, ganhos, live_curtidas, live_visualizacoes
-    FROM historico
-    WHERE usuario = ? AND data >= ? AND data <= ? AND influencer IN ({placeholders})
-    """
-    
-    # Converte os parâmetros para uma tupla para evitar erros de tipo
-    params = tuple([user, start_date.strftime("%Y-%m-%d 00:00:00"),
-                    end_date.strftime("%Y-%m-%d 23:59:59")] + influencers)
-
-    try:
-        return pd.read_sql_query(query, conn, params=params)
-    except Exception as e:
-        st.error(f"Erro ao buscar dados do banco de dados: {e}")
-        return pd.DataFrame()
 
 # ==============================================
 # INTERFACES DO USUÁRIO
@@ -335,16 +353,17 @@ def login_section():
         if not usuario or not senha:
             st.warning("Por gentileza, preencha todos os campos")
             return
-        
-        logged_in, tipo_usuario = verificar_login(usuario, senha)
-        if logged_in:
+
+        usuario_db = verificar_login(usuario, senha)
+        if usuario_db:
             st.session_state.logged_in = True
             st.session_state.usuario = usuario
-            st.session_state.tipo_usuario = tipo_usuario
+            st.session_state.tipo_usuario = usuario_db[3]
             st.success("Login realizado com sucesso!")
             st.rerun()
         else:
             st.error("Usuário ou senha inválidos")
+
 
 def main_app():
     st.title(f"Bem-vindo, ao gerenciamento de carreira de tiktokers {st.session_state.usuario}!")
@@ -358,7 +377,7 @@ def main_app():
         else:
             with st.spinner(f"Buscando dados de @{influencer}..."):
                 dados = get_tiktok_data_from_scraping(influencer)
-                
+
                 live_data = {'live_curtidas': 0, 'live_visualizacoes': 0}
                 if check_monthly_live_scrape(f"@{influencer}", st.session_state.usuario):
                     live_data = get_tiktok_data_from_scraping(influencer)
@@ -391,20 +410,13 @@ def main_app():
                     st.error("Não foi possível obter os dados do influencer. Verifique o nome ou tente novamente.")
 
     st.header("2. Análise do Histórico de Influencers")
-    
-    # Busca a lista de influencers e garante que o dataframe não esteja vazio
-    df_influencers = pd.read_sql_query(
+    influencers_disponiveis = pd.read_sql_query(
         "SELECT DISTINCT influencer FROM historico WHERE usuario = ?", conn, params=[st.session_state.usuario]
-    )
+    )['influencer'].tolist()
 
-    if not df_influencers.empty:
-        influencers_disponiveis = df_influencers['influencer'].tolist()
-    else:
-        influencers_disponiveis = []
-        st.info("Nenhum influencer encontrado no histórico. Use a seção acima para adicionar um.")
-        
     if not influencers_disponiveis:
         st.info("Nenhum influencer encontrado no histórico. Use a seção acima para adicionar um.")
+
     else:
         col_filtros1, col_filtros2 = st.columns([2, 1])
 
@@ -425,8 +437,16 @@ def main_app():
             if not influencers_selecionados:
                 st.warning("Por favor, selecione ao menos um influencer.")
             else:
-                # Chama a nova função refatorada para buscar os dados
-                df = _fetch_data(st.session_state.usuario, influencers_selecionados, data_inicio, data_fim)
+                query = """
+                SELECT influencer, tipo, valor, data, ganhos, live_curtidas, live_visualizacoes
+                FROM historico
+                WHERE usuario = ? AND data >= ? AND data <= ? AND influencer IN ({})
+                """.format(','.join(['?'] * len(influencers_selecionados)))
+
+                params = [st.session_state.usuario, data_inicio.strftime("%Y-%m-%d 00:00:00"),
+                          data_fim.strftime("%Y-%m-%d 23:59:59")] + influencers_selecionados
+
+                df = pd.read_sql_query(query, conn, params=params)
 
                 if not df.empty:
                     df['data'] = pd.to_datetime(df['data'])
@@ -514,6 +534,7 @@ def main_app():
                             " (", "").replace(")", ""))
                     st.plotly_chart(fig_evolucao, use_container_width=True)
 
+                    # Novo gráfico de variação diária
                     st.subheader("Variação Diária de Seguidores e Curtidas")
                     df_seguidores = df[df['tipo'] == 'seguidores'].set_index('data')
                     df_curtidas = df[df['tipo'] == 'curtidas'].set_index('data')
@@ -551,12 +572,15 @@ def main_app():
                         df_pivot['taxa_engajamento_absoluta'] = (df_pivot['curtidas'] / df_pivot['seguidores']).fillna(
                             0)
                         df_engagement = df_pivot[['influencer', 'taxa_engajamento_absoluta']].round(4)
+
                         st.dataframe(df_engagement.rename(
                             columns={'taxa_engajamento_absoluta': 'Engajamento Absoluto (curtidas/seguidores)'}),
                             use_container_width=True)
 
+                        # Ordena os influencers por engajamento
                         df_engagement_sorted = df_engagement.sort_values(by='taxa_engajamento_absoluta',
                                                                          ascending=False)
+
                         fig_engajamento = px.bar(df_engagement_sorted, x='influencer', y='taxa_engajamento_absoluta',
                                                  title="Taxa de Engajamento Média (Valor Absoluto)",
                                                  labels={
@@ -564,7 +588,8 @@ def main_app():
                                                      'influencer': 'Influencer'})
                         st.plotly_chart(fig_engajamento, use_container_width=True)
                     else:
-                        st.info("Para visualizar a taxa de engajamento, certifique-se de que o histórico inclui dados de 'seguidores' e 'curtidas'.")
+                        st.info(
+                            "Para visualizar a taxa de engajamento, certifique-se de que o histórico inclui dados de 'seguidores' e 'curtidas'.")
 
                     st.subheader("Análise de Lives")
                     df_lives = df[
@@ -575,12 +600,14 @@ def main_app():
                         lives_por_mes = df_lives.groupby(['influencer', 'mes']).size().reset_index(
                             name='quantidade_lives')
                         lives_por_mes['mes'] = lives_por_mes['mes'].astype(str)
+
                         st.subheader("Quantidade de Lives por Mês")
                         fig_lives_mes = px.bar(lives_por_mes, x='mes', y='quantidade_lives', color='influencer',
                                                title="Quantidade de Lives Registradas por Mês")
                         st.plotly_chart(fig_lives_mes, use_container_width=True)
 
                         st.subheader("Visualizações e Curtidas em Lives")
+                        # Modificação para ajustar a escala e o hover
                         df_lives['live_visualizacoes_k'] = df_lives['live_visualizacoes'] / 1000
 
                         fig_lives = px.scatter(df_lives, x='data', y='live_visualizacoes_k', color='influencer',
@@ -591,11 +618,13 @@ def main_app():
                                                    'live_visualizacoes_k': False
                                                },
                                                title="Visualizações e Curtidas em Lives por Período")
+
                         fig_lives.update_layout(
                             yaxis_title="Visualizações de Live (em milhares)",
                             hovermode="x unified"
                         )
                         st.plotly_chart(fig_lives, use_container_width=True)
+
                     else:
                         st.info("Nenhum dado de live encontrado para o período selecionado.")
 
@@ -603,16 +632,22 @@ def main_app():
                 else:
                     st.warning("Nenhum dado encontrado para os filtros selecionados.")
 
+    # ---
+    # SEÇÃO DE PRODUTOS GANHADOS
+    # ---
     st.header("3. Gerenciamento de Produtos Ganhados em Live")
+
     if not influencers_disponiveis:
         st.info("Nenhum influencer encontrado no histórico. Adicione um na seção 1 para gerenciar produtos.")
     else:
         tab1, tab2 = st.tabs(["Adicionar Produto", "Consultar Produtos"])
+
         with tab1:
             st.subheader("Adicionar Produto Manualmente")
             influencer_produto = st.selectbox("Selecione o Influencer", influencers_disponiveis)
             nome_produto = st.text_input("Nome do Produto")
             valor_estimado = st.number_input("Valor Estimado (R$)", min_value=0.0, format="%.2f")
+
             if st.button("Adicionar Produto Ganhado"):
                 if not nome_produto or valor_estimado <= 0:
                     st.warning("Por favor, preencha o nome do produto e o valor estimado.")
@@ -621,18 +656,21 @@ def main_app():
                         st.success(f"Produto '{nome_produto}' adicionado com sucesso para {influencer_produto}!")
                     else:
                         st.error("Falha ao adicionar o produto.")
+
         with tab2:
             st.subheader("Consultar Produtos Ganhados")
             influencers_consulta_prod = st.multiselect(
                 "Selecione os Influencers para a Consulta de Produtos:",
                 influencers_disponiveis
             )
+
             col_data_inicio_prod, col_data_fim_prod = st.columns(2)
             with col_data_inicio_prod:
                 data_inicio_prod = st.date_input("Data de Início da Consulta", datetime.now() - timedelta(days=30),
                                                  key="data_inicio_prod")
             with col_data_fim_prod:
                 data_fim_prod = st.date_input("Data de Fim da Consulta", datetime.now(), key="data_fim_prod")
+
             if st.button("Buscar Produtos Ganhados"):
                 if not influencers_consulta_prod:
                     st.warning("Selecione pelo menos um influencer para a consulta.")
@@ -642,15 +680,20 @@ def main_app():
                         data_inicio_prod,
                         data_fim_prod
                     )
+
                     if not df_produtos.empty:
                         df_produtos['data'] = pd.to_datetime(df_produtos['data']).dt.strftime('%Y-%m-%d %H:%M:%S')
                         st.dataframe(df_produtos, use_container_width=True)
-                        exportar_excel(df_produtos, filename="produtos_ganhados.xlsx")                        
+                        #exportar_excel(df_produtos, filename="produtos_ganhados.xlsx")
+                        df_produtos.to_excel("produtos_ganhados.xlsx", index=False)
+                                                
                     else:
                         st.info("Nenhum produto encontrado para os influencers e período selecionados.")
+
     if st.sidebar.button("Sair"):
         st.session_state.clear()
         st.rerun()
+
 
 # ==============================================
 # EXECUÇÃO PRINCIPAL

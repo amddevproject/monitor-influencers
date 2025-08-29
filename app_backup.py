@@ -12,6 +12,10 @@ import time
 
 
 
+# ...
+# Seu código continua abaixo
+
+
 # ==============================================
 # CONFIGURAÇÃO INICIAL DO APP
 # ==============================================
@@ -86,7 +90,7 @@ def convert_to_int(text):
 
 def estimate_earnings(views):
     """Estimativa simples de ganhos baseada em visualizações."""
-# Ajuste conforme sua lógica
+    # Ajuste conforme sua lógica
     return views * 0.01
 # ...existing code...
 
@@ -222,26 +226,25 @@ conn, cursor = init_db()
 # ==============================================
 # FUNÇÕES UTILITÁRIAS
 # ==============================================
-#def convert_to_int(text):
-   # """Converte texto do TikTok (ex: '1.2M') para inteiro."""
-   # text = text.replace(',', '').replace('.', '')
-    #if 'K' in text:
-   #     return int(float(text.replace('K', '')) * 1000)
-    #elif 'M' in text:
-    #    return int(float(text.replace('M', '')) * 1000000)
-    #elif 'B' in text:
-    #    return int(float(text.replace('B', '')) * 1000000000)
-    #else:
-    #    try:
-    #        return int(text)
-    #    except:
-    #        return 0
+def convert_to_int(text):
+    """Converte texto do TikTok (ex: '1.2M') para inteiro."""
+    text = text.replace(',', '').replace('.', '')
+    if 'K' in text:
+        return int(float(text.replace('K', '')) * 1000)
+    elif 'M' in text:
+        return int(float(text.replace('M', '')) * 1000000)
+    elif 'B' in text:
+        return int(float(text.replace('B', '')) * 1000000000)
+    else:
+        try:
+            return int(text)
+        except:
+            return 0
 
 def estimate_earnings(views):
     """Estimativa simples de ganhos baseada em visualizações."""
     # Ajuste conforme sua lógica
     return views * 0.01
-
 
 # ==============================================
 # CONFIGURAÇÃO DO PLAYWRIGHT PARA AMBIENTES HEADLESS
@@ -685,9 +688,7 @@ def main_app():
                     if not df_produtos.empty:
                         df_produtos['data'] = pd.to_datetime(df_produtos['data']).dt.strftime('%Y-%m-%d %H:%M:%S')
                         st.dataframe(df_produtos, use_container_width=True)
-                        #exportar_excel(df_produtos, filename="produtos_ganhados.xlsx")
-                        df_produtos.to_excel("produtos_ganhados.xlsx", index=False)
-                                                
+                        exportar_excel(df_produtos, filename="produtos_ganhados.xlsx")
                     else:
                         st.info("Nenhum produto encontrado para os influencers e período selecionados.")
 
